@@ -1,6 +1,8 @@
+* Content
 Contains R markdown file used for the initial cleaning process
 Also contains two datasets generated from the Rmd
-To replicate:
+
+* To replicate:
 Download the Rmd into a folder on your pc or mac
 Visit the US FDA website and download the FAERS 2024 dataset onto your computer
 Open the Rmd in R studio
