@@ -1,0 +1,1088 @@
+---
+title: "faers_data_capstone"
+author: "MK NYARKO"
+date: "2025-10-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(data.table)
+library(dplyr)
+library(stringr)
+library(tidyr)
+```
+
+# Q1 2024 DATA MANAGEMENT ONLY
+
+```{r}
+# Paths
+faers_path <- "/Users/mknyarko/Documents/COURSES BROWN SCHOOL/CAPSTONE/CAPSTONE PROJECT/ANALYSIS FILES/FAERS DATA 2024/faers_ascii_2024q1/ASCII"
+```
+
+```{r}
+# Load DRUG table
+drug_q1 <- fread(file.path(faers_path, "DRUG24Q1.txt"), sep = "$")
+```
+
+```{r}
+# Extract semaglutide-related reports
+semaglutide_q1 <- drug_q1[
+  grepl("SEMAGLUTIDE|OZEMPIC|WEGOVY|RYBELSUS", drugname, ignore.case = TRUE) |
+  grepl("SEMAGLUTIDE", prod_ai, ignore.case = TRUE)
+]
+```
+
+```{r}
+# Vector to keep only Semaglutide CASEIDs
+semaglutide_ids_q1 <- unique(semaglutide_q1$caseid)
+```
+
+```{r}
+# Load other Q1 tables
+demo_q1 <- fread(file.path(faers_path, "DEMO24Q1.txt"), sep = "$")
+reac_q1 <- fread(file.path(faers_path, "REAC24Q1.txt"), sep = "$")
+outc_q1 <- fread(file.path(faers_path, "OUTC24Q1.txt"), sep = "$")
+```
+
+```{r}
+# Restrict to semaglutide CASEIDs
+  demo_q1_ids <- demo_q1[caseid %in% semaglutide_ids_q1]
+  reac_q1_ids <- reac_q1[caseid %in% semaglutide_ids_q1]
+  outc_q1_ids <- outc_q1[caseid %in% semaglutide_ids_q1]
+```
+
+```{r}
+# Limit to U.S. cases only
+  demo_q1_ids_US <- demo_q1_ids[reporter_country == "US"]
+```
+
+```{r}
+# Merge: demographics + outcomes
+  merged_demo_outc_q1 <- merge(demo_q1_ids_US, outc_q1_ids, by = "caseid", all.x = TRUE)
+```
+
+```{r}
+# Merge in reactions
+  merged_d_o_reac_q1 <- merge(merged_demo_outc_q1, reac_q1_ids, by = "caseid", all.x = TRUE)
+```
+
+```{r}
+ # Merge in semaglutide drug info
+  merged_all_q1 <- merge(merged_d_o_reac_q1, semaglutide_q1, by = "caseid", all.x = TRUE)
+```
+
+```{r}
+# Make duplicate names unique
+names(merged_all_q1) <- make.unique(names(merged_all_q1))
+
+```
+
+
+```{r}
+# Remove duplicate columns
+merged_all_q1_clean <- merged_all_q1 %>%
+  select(-primaryid.x.1, -primaryid.y.1)
+```
+
+```{r}
+# Checked the actual names in the dataframe, not the names presented in data view
+names(merged_all_q1)
+
+```
+
+
+```{r}
+# Vector to keep only Semaglutide CASEIDs
+merged_all_q1_ids <- unique(merged_all_q1_clean$caseid)
+```
+
+```{r}
+# Define severity ranking (custom order)
+severity_order <- c("DE", "LT", "HO", "DS", "CA", "RI", "OT")
+
+```
+
+```{r}
+# Clean dataset so that each CASEID has only the most serious outcome
+merged_all_q1_serious <- merged_all_q1_clean %>%
+  mutate(
+    severity_rank = match(outc_cod, severity_order)  # assign rank
+  ) %>%
+  group_by(caseid) %>%
+  slice_min(order_by = severity_rank, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  select(-severity_rank)  # drop helper column if not needed
+```
+
+```{r}
+# Check results, compared raw merged to serious merged, then serious merged to reference unique case id
+nrow(merged_all_q1)                     # original rows (with duplicates)
+length(unique(merged_all_q1$caseid))    # number of unique CASEIDs
+nrow(merged_all_q1_serious)             # should equal number of unique CASEIDs
+```
+
+```{r}
+# Write the 2024 Q1 Full csv file
+fwrite(merged_all_q1_serious, "semaglutide_2024Q1_full.csv")
+```
+
+# Q2 2024 DATA MANAGEMENT ONLY
+
+```{r}
+# Paths
+faers_path2 <- "/Users/mknyarko/Documents/COURSES BROWN SCHOOL/CAPSTONE/CAPSTONE PROJECT/ANALYSIS FILES/FAERS DATA 2024/faers_ascii_2024q2/ASCII"
+```
+
+```{r}
+# Load DRUG table
+drug_q2 <- fread(file.path(faers_path2, "DRUG24Q2.txt"), sep = "$")
+```
+
+```{r}
+# Extract semaglutide-related reports
+semaglutide_q2 <- drug_q2[
+  grepl("SEMAGLUTIDE|OZEMPIC|WEGOVY|RYBELSUS", drugname, ignore.case = TRUE) |
+  grepl("SEMAGLUTIDE", prod_ai, ignore.case = TRUE)
+]
+```
+
+```{r}
+# Vector to keep only Semaglutide CASEIDs
+semaglutide_ids_q2 <- unique(semaglutide_q2$caseid)
+```
+
+```{r}
+# Load other Q2 tables
+demo_q2 <- fread(file.path(faers_path2, "DEMO24Q2.txt"), sep = "$")
+reac_q2 <- fread(file.path(faers_path2, "REAC24Q2.txt"), sep = "$")
+outc_q2 <- fread(file.path(faers_path2, "OUTC24Q2.txt"), sep = "$")
+```
+
+```{r}
+# Restrict to semaglutide CASEIDs
+  demo_q2_ids <- demo_q2[caseid %in% semaglutide_ids_q2]
+  reac_q2_ids <- reac_q2[caseid %in% semaglutide_ids_q2]
+  outc_q2_ids <- outc_q2[caseid %in% semaglutide_ids_q2]
+```
+
+```{r}
+# Limit to U.S. cases only
+  demo_q2_ids_US <- demo_q2_ids[reporter_country == "US"]
+```
+
+```{r}
+# Merge: demographics + outcomes
+  merged_demo_outc_q2 <- merge(demo_q2_ids_US, outc_q2_ids, by = "caseid", all.x = TRUE)
+```
+
+```{r}
+# Merge in reactions
+  merged_d_o_reac_q2 <- merge(merged_demo_outc_q2, reac_q2_ids, by = "caseid", all.x = TRUE)
+```
+
+```{r}
+ # Merge in semaglutide drug info
+  merged_all_q2 <- merge(merged_d_o_reac_q2, semaglutide_q2, by = "caseid", all.x = TRUE)
+```
+
+```{r}
+# Make duplicate names unique
+names(merged_all_q2) <- make.unique(names(merged_all_q2))
+
+```
+
+```{r}
+# Checked the actual names in the dataframe, not the names presented in data view
+names(merged_all_q2)
+```
+
+
+```{r}
+# Remove duplicate columns
+merged_all_q2_clean <- merged_all_q2 %>%
+  select(-primaryid.x.1, -primaryid.y.1)
+```
+
+```{r}
+# Checked the actual names in the dataframe, not the names presented in data view
+names(merged_all_q2_clean)
+```
+
+
+```{r}
+# Vector to keep only Semaglutide CASEIDs
+merged_all_q2_ids <- unique(merged_all_q2_clean$caseid)
+```
+
+```{r}
+# Define severity ranking (custom order)
+severity_order <- c("DE", "LT", "HO", "DS", "CA", "RI", "OT")
+
+```
+
+```{r}
+# Clean dataset so that each CASEID has only the most serious outcome
+merged_all_q2_serious <- merged_all_q2_clean %>%
+  mutate(
+    severity_rank = match(outc_cod, severity_order)  # assign rank
+  ) %>%
+  group_by(caseid) %>%
+  slice_min(order_by = severity_rank, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  select(-severity_rank)  # drop helper column if not needed
+```
+
+```{r}
+# Check results, compared raw merged to serious merged, then serious merged to reference unique case id
+nrow(merged_all_q2)                     # original rows (with duplicates)
+length(unique(merged_all_q2$caseid))    # number of unique CASEIDs
+nrow(merged_all_q2_serious)             # should equal number of unique CASEIDs
+```
+
+```{r}
+# Write the 2024 Q2 Full csv file
+fwrite(merged_all_q2_serious, "semaglutide_2024Q2_full.csv")
+```
+
+# Q3 2024 DATA MANAGEMENT ONLY
+
+```{r}
+# Paths
+faers_path3 <- "/Users/mknyarko/Documents/COURSES BROWN SCHOOL/CAPSTONE/CAPSTONE PROJECT/ANALYSIS FILES/FAERS DATA 2024/faers_ascii_2024q3/ASCII"
+```
+
+```{r}
+# Load DRUG table
+drug_q3 <- fread(file.path(faers_path3, "DRUG24Q3.txt"), sep = "$")
+```
+
+```{r}
+# Extract semaglutide-related reports
+semaglutide_q3 <- drug_q3[
+  grepl("SEMAGLUTIDE|OZEMPIC|WEGOVY|RYBELSUS", drugname, ignore.case = TRUE) |
+  grepl("SEMAGLUTIDE", prod_ai, ignore.case = TRUE)
+]
+```
+
+```{r}
+# Vector to keep only Semaglutide CASEIDs
+semaglutide_ids_q3 <- unique(semaglutide_q3$caseid)
+```
+
+```{r}
+# Load other Q3 tables
+demo_q3 <- fread(file.path(faers_path3, "DEMO24Q3.txt"), sep = "$")
+reac_q3 <- fread(file.path(faers_path3, "REAC24Q3.txt"), sep = "$")
+outc_q3 <- fread(file.path(faers_path3, "OUTC24Q3.txt"), sep = "$")
+```
+
+```{r}
+# Restrict to semaglutide CASEIDs
+  demo_q3_ids <- demo_q3[caseid %in% semaglutide_ids_q3]
+  reac_q3_ids <- reac_q3[caseid %in% semaglutide_ids_q3]
+  outc_q3_ids <- outc_q3[caseid %in% semaglutide_ids_q3]
+```
+
+```{r}
+# Limit to U.S. cases only
+  demo_q3_ids_US <- demo_q3_ids[reporter_country == "US"]
+```
+
+```{r}
+# Merge: demographics + outcomes
+  merged_demo_outc_q3 <- merge(demo_q3_ids_US, outc_q3_ids, by = "caseid", all.x = TRUE)
+```
+
+```{r}
+# Merge in reactions
+  merged_d_o_reac_q3 <- merge(merged_demo_outc_q3, reac_q3_ids, by = "caseid", all.x = TRUE)
+```
+
+```{r}
+ # Merge in semaglutide drug info
+  merged_all_q3 <- merge(merged_d_o_reac_q3, semaglutide_q3, by = "caseid", all.x = TRUE)
+```
+
+```{r}
+# Checked the actual names in the dataframe, not the names presented in data view
+names(merged_all_q3)
+```
+
+
+```{r}
+# Make duplicate names unique
+names(merged_all_q3) <- make.unique(names(merged_all_q3))
+
+```
+
+```{r}
+# Checked the actual names in the dataframe, not the names presented in data view
+names(merged_all_q3)
+```
+
+
+```{r}
+# Remove duplicate columns
+merged_all_q3_clean <- merged_all_q3 %>%
+  select(-primaryid.x.1, -primaryid.y.1)
+```
+
+```{r}
+# Checked the actual names in the dataframe, not the names presented in data view
+names(merged_all_q3_clean)
+```
+
+
+```{r}
+# Vector to keep only Semaglutide CASEIDs
+merged_all_q3_ids <- unique(merged_all_q3_clean$caseid)
+```
+
+```{r}
+# Define severity ranking (custom order)
+severity_order <- c("DE", "LT", "HO", "DS", "CA", "RI", "OT")
+
+```
+
+```{r}
+# Clean dataset so that each CASEID has only the most serious outcome
+merged_all_q3_serious <- merged_all_q3_clean %>%
+  mutate(
+    severity_rank = match(outc_cod, severity_order)  # assign rank
+  ) %>%
+  group_by(caseid) %>%
+  slice_min(order_by = severity_rank, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  select(-severity_rank)  # drop helper column if not needed
+```
+
+```{r}
+# Check results, compared raw merged to serious merged, then serious merged to reference unique case id
+nrow(merged_all_q3)                     # original rows (with duplicates)
+length(unique(merged_all_q3$caseid))    # number of unique CASEIDs
+nrow(merged_all_q3_serious)             # should equal number of unique CASEIDs
+```
+
+```{r}
+# Write the 2024 Q3 Full csv file
+fwrite(merged_all_q3_serious, "semaglutide_2024Q3_full.csv")
+```
+
+# Q4 2024 DATA MANAGEMENT ONLY
+
+```{r}
+# Paths
+faers_path4 <- "/Users/mknyarko/Documents/COURSES BROWN SCHOOL/CAPSTONE/CAPSTONE PROJECT/ANALYSIS FILES/FAERS DATA 2024/faers_ascii_2024q4/ASCII"
+```
+
+```{r}
+# Load DRUG table
+drug_q4 <- fread(file.path(faers_path4, "DRUG24Q4.txt"), sep = "$")
+```
+
+```{r}
+# Extract semaglutide-related reports
+semaglutide_q4 <- drug_q4[
+  grepl("SEMAGLUTIDE|OZEMPIC|WEGOVY|RYBELSUS", drugname, ignore.case = TRUE) |
+  grepl("SEMAGLUTIDE", prod_ai, ignore.case = TRUE)
+]
+```
+
+```{r}
+# Vector to keep only Semaglutide CASEIDs
+semaglutide_ids_q4 <- unique(semaglutide_q4$caseid)
+```
+
+```{r}
+# Load other Q4 tables
+demo_q4 <- fread(file.path(faers_path4, "DEMO24Q4.txt"), sep = "$")
+reac_q4 <- fread(file.path(faers_path4, "REAC24Q4.txt"), sep = "$")
+outc_q4 <- fread(file.path(faers_path4, "OUTC24Q4.txt"), sep = "$")
+```
+
+```{r}
+# Restrict to semaglutide CASEIDs
+  demo_q4_ids <- demo_q4[caseid %in% semaglutide_ids_q4]
+  reac_q4_ids <- reac_q4[caseid %in% semaglutide_ids_q4]
+  outc_q4_ids <- outc_q4[caseid %in% semaglutide_ids_q4]
+```
+
+```{r}
+# Limit to U.S. cases only
+  demo_q4_ids_US <- demo_q4_ids[reporter_country == "US"]
+```
+
+```{r}
+# Merge: demographics + outcomes
+  merged_demo_outc_q4 <- merge(demo_q4_ids_US, outc_q4_ids, by = "caseid", all.x = TRUE)
+```
+
+```{r}
+# Merge in reactions
+  merged_d_o_reac_q4 <- merge(merged_demo_outc_q4, reac_q4_ids, by = "caseid", all.x = TRUE)
+```
+
+# Merge in semaglutide drug info
+# merged_all_q4 <- merge(merged_d_o_reac_q4, semaglutide_q4, by = "caseid", all.x = TRUE) 
+
+#First merge attempt with semaglutide_q4 dataset produced an error as there may be duplicate case id's in there
+# Semaglutide_q4 dataset was de-duplicated (by selecting first line case id only for every duplicated set)
+# Merger was re-attempted
+
+```{r}
+# De-duplicating the semaglutide data
+semaglutide_q4_unique <- semaglutide_q4[
+  !duplicated(caseid), 
+]
+```
+
+```{r}
+# Re-attempt merge in semaglutide drug info
+  merged_all_q4 <- merge(merged_d_o_reac_q4, semaglutide_q4_unique, by = "caseid", all.x = TRUE)
+```
+
+
+```{r}
+# Checked the actual names in the dataframe, not the names presented in data view
+names(merged_all_q4)
+```
+
+
+```{r}
+# Make duplicate names unique
+names(merged_all_q4) <- make.unique(names(merged_all_q4))
+
+```
+
+```{r}
+# Checked the actual names in the dataframe, not the names presented in data view
+names(merged_all_q4)
+```
+
+
+```{r}
+# Remove duplicate columns
+merged_all_q4_clean <- merged_all_q4 %>%
+  select(-primaryid.x.1, -primaryid.y.1)
+```
+
+```{r}
+# Checked the actual names in the dataframe, not the names presented in data view
+names(merged_all_q4_clean)
+```
+
+
+```{r}
+# Vector to keep only Semaglutide CASEIDs
+merged_all_q4_ids <- unique(merged_all_q4_clean$caseid)
+```
+
+```{r}
+# Define severity ranking (custom order)
+severity_order <- c("DE", "LT", "HO", "DS", "CA", "RI", "OT")
+
+```
+
+```{r}
+# Clean dataset so that each CASEID has only the most serious outcome
+merged_all_q4_serious <- merged_all_q4_clean %>%
+  mutate(
+    severity_rank = match(outc_cod, severity_order)  # assign rank
+  ) %>%
+  group_by(caseid) %>%
+  slice_min(order_by = severity_rank, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  select(-severity_rank)  # drop helper column if not needed
+```
+
+```{r}
+# Check results, compared raw merged to serious merged, then serious merged to reference unique case id
+nrow(merged_all_q4)                     # original rows (with duplicates)
+length(unique(merged_all_q4$caseid))    # number of unique CASEIDs
+nrow(merged_all_q4_serious)             # should equal number of unique CASEIDs
+```
+
+```{r}
+# Write the 2024 Q4 Full csv file
+fwrite(merged_all_q4_serious, "semaglutide_2024Q4_full.csv")
+```
+
+# COMBINING ACROSS ALL 4 QUARTERS
+
+```{r}
+# Load all four cleaned quarterly datasets
+q1 <- fread("semaglutide_2024Q1_full.csv")
+q2 <- fread("semaglutide_2024Q2_full.csv")
+q3 <- fread("semaglutide_2024Q3_full.csv")
+q4 <- fread("semaglutide_2024Q4_full.csv")
+```
+
+```{r}
+# Add a quarter column to each dataset to help identify cases by their quarters in the full file
+q1[, quarter := "2024Q1"]
+q2[, quarter := "2024Q2"]
+q3[, quarter := "2024Q3"]
+q4[, quarter := "2024Q4"]
+
+```
+
+```{r}
+# Now bind them together
+semaglutide_2024_all <- rbindlist(
+  list(q1, q2, q3, q4), 
+  use.names = TRUE, 
+  fill = TRUE
+)
+```
+
+```{r}
+# Checked for duplicate columns (variables)
+names(semaglutide_2024_all)
+```
+
+```{r}
+# Checked for duplicate rows
+length(unique(semaglutide_2024_all$caseid))    # number of unique CASEIDs
+nrow(semaglutide_2024_all)             # should equal number of unique CASEIDs
+# If there are duplicate rows, line 1 should yield lower value than line 2
+```
+# The rows appear duplicated.
+# The same caseid can appear in multiple quarters because of case versioning.
+# FAERS is cumulative: once a case is reported, it can be updated in later quarters (e.g., new follow-up info, corrected outcome).
+# So the same CASEID can appear in Q1 and again in Q3, with updated demographics, drugs, reactions, or outcomes.
+# That means this consolidated 2024 dataset may contain duplicates across quarters.
+
+```{r}
+# Save consolidated dataset
+fwrite(semaglutide_2024_all, "semaglutide_FAERS_2024_full_US.csv")
+```
+
+# FURTHER DATA MANAGEMENT TO PREPARE DATA FOR ANALYSIS
+
+```{r}
+# Keeping only the most recent version of each case id across quarters
+semaglutide_2024_dedup <- semaglutide_2024_all %>%
+  group_by(caseid) %>%
+  slice_max(order_by = quarter, n = 1, with_ties = FALSE) %>%
+  ungroup()
+```
+
+```{r}
+# Save consolidated deduplicated dataset
+fwrite(semaglutide_2024_dedup, "semaglutide_FAERS_2024_full_dedup.csv")
+```
+
+```{r}
+# Creating subset dataset containing only preferred variables using dplyr
+vars <- c("caseid", "caseversion", "age", "age_cod", "sex", 
+          "wt", "wt_cod", "reporter_country", "occr_country", "drugname",
+           "prod_ai", "dose_amt", "dose_unit", "role_cod", "pt",
+           "outc_cod", "event_dt", "rept_dt", "quarter")
+
+semaglutide_2024_subset <- semaglutide_2024_dedup %>%
+  select(any_of(vars)) 
+```
+
+```{r}
+# Creating age group variable inside subset
+semaglutide_2024_subset_agegroup <- semaglutide_2024_subset %>%
+  mutate(
+    age_group = case_when(
+      age >= 65 ~ "Older adults (≥65)",
+      age >= 18 & age < 65 ~ "Younger adults (18–64)",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  select(
+    caseid, caseversion,
+    age, age_group, age_cod, sex, wt, wt_cod,
+    reporter_country, occr_country,
+    drugname, prod_ai, dose_amt, dose_unit, role_cod,
+    pt, outc_cod,
+    event_dt, rept_dt, quarter
+  )
+```
+
+```{r}
+# Checked for duplicate adverse events
+length(unique(semaglutide_2024_subset_agegroup$pt))    # number of unique adverse events
+nrow(semaglutide_2024_subset_agegroup)             # should equal number of unique adverse events
+# If there are duplicate rows, line 1 should yield lower value than line 2
+# Duplicates also signify patterns in ae's
+```
+
+# DATA CLEANING FOR NEW SUBSET DATA (WITH AGE GROUPINGS)
+
+```{r}
+# Ensuring structure and data types are correct
+str(semaglutide_2024_subset_agegroup)
+summary(semaglutide_2024_subset_agegroup)
+```
+
+```{r}
+# Converting variables to factor and numeric as needed
+semaglutide_2024_subset_agegroup <- semaglutide_2024_subset_agegroup %>%
+  mutate(
+    age = as.numeric(age),
+    across(c(sex, reporter_country, occr_country, outc_cod, role_cod, quarter),
+           ~ as.factor(.))
+  )
+```
+
+```{r}
+summary(semaglutide_2024_subset_agegroup)
+
+fwrite(semaglutide_2024_subset_agegroup, "for_wt_dose_analysis.csv")
+```
+
+```{r}
+# REMOVING MISSING DATA FROM AGE VARIABLE
+semaglutide_2024_age_no_NA <- semaglutide_2024_subset_agegroup %>%
+  filter(!is.na(age), age >= 18, age <= 120)
+
+summary(semaglutide_2024_age_no_NA)
+```
+
+```{r}
+# Replacing all missing spaces with NA in non-numeric (factor) variable columns only
+
+semaglutide_2024_age_no_NA <- semaglutide_2024_age_no_NA %>%
+  mutate(
+    across(
+      where(is.factor),
+      ~ {
+        # Convert factor → character for cleaning
+        x <- as.character(.)
+        
+        # Trim, collapse extra spaces, and standardize case
+        x <- str_squish(str_to_upper(trimws(x)))
+        
+        # Replace placeholder values with real NA
+        x[x %in% c("", "NA", "N/A", "NULL", "NONE", "MISSING", "UNKNOWN", "NOT AVAILABLE")] <- NA
+        
+        # Convert back to factor
+        factor(x)
+      }
+    )
+  )
+
+summary(semaglutide_2024_age_no_NA)
+```
+
+
+```{r}
+# Checking for the distinct drugnames
+library(dplyr)
+
+semaglutide_2024_age_no_NA %>%
+  distinct(drugname)
+```
+
+```{r}
+# Checking for %proportions of drugnames
+semaglutide_2024_age_no_NA %>%
+  count(drugname) %>%
+  mutate(percentage = round(100 * n / sum(n), 1)) %>%
+  arrange(desc(n))
+
+```
+
+```{r}
+# Standardizing the drugnames
+semaglutide_2024_std_drugnames <- semaglutide_2024_age_no_NA %>%
+  mutate(
+    # Convert everything to uppercase first
+    drugname = toupper(drugname),
+    
+    # Create a clean standardized version
+    drug_standardized = case_when(
+      #  Combination products FIRST (so they’re not caught by generic SEMAGLUTIDE rule)
+      str_detect(drugname, "SEMAGLUTIDE") &
+        str_detect(drugname, "CYANOCOBALAMIN|\\+|/|\\\\") ~ "COMBINATION PRODUCT",
+
+      #  Brand-specific products
+      str_detect(drugname, "OZEMPIC") ~ "OZEMPIC",
+      str_detect(drugname, "WEGOVY") ~ "WEGOVY",
+      str_detect(drugname, "RYBELSUS") ~ "RYBELSUS",
+
+      #  Generic semaglutide (unbranded or unknown)
+      str_detect(drugname, "SEMAGLUTIDE") &
+        !str_detect(drugname, "OZEMPIC|WEGOVY|RYBELSUS") ~ "SEMAGLUTIDE (UNSPECIFIED)",
+
+      #  Everything else
+      TRUE ~ "OTHER"
+    )
+  )%>%                                                   # Rearranging so standardized drug names appear right after drugname variable
+  select(
+    caseid, caseversion,
+    age, age_group, age_cod, sex, wt, wt_cod,
+    reporter_country, occr_country,
+    drugname, drug_standardized, prod_ai, dose_amt, dose_unit, role_cod,
+    pt, outc_cod,
+    event_dt, rept_dt, quarter
+  )
+
+```
+
+```{r}
+# Verifying results
+semaglutide_2024_std_drugnames %>%
+  count(drug_standardized) %>%
+  mutate(percentage = round(100 * n / sum(n), 1)) %>%
+  arrange(desc(n))
+
+```
+
+```{r}
+# Checking for the distinct outcomes
+library(dplyr)
+
+semaglutide_2024_std_drugnames %>%
+  distinct(outc_cod)
+
+```
+
+```{r}
+# Checking for %proportions of outcomes
+semaglutide_2024_std_drugnames %>%
+  mutate(outc_cod = if_else(is.na(outc_cod), "Missing", outc_cod)) %>%  # Label missing
+  count(outc_cod, sort = TRUE) %>%                                     # Count by outcome type
+  mutate(
+    proportion = round(100 * n / sum(n), 1)                            # Calculate percentage
+  )
+```
+
+# NA or missiong outcomes make up 50% (>20%) of the data. Cleaning it out will not be recommended for descriptives. Reporting on missing data is a better option. "Not Reported" category to be created. (NB: NR will be cleaned out for regression modelling)
+```{r}
+# Creating an NR category
+semaglutide_2024_outc_NR <- semaglutide_2024_std_drugnames %>%
+  mutate(outc_cod = if_else(is.na(outc_cod), "NR", outc_cod))
+
+# All NA's appear as NR (Not reported)
+
+# Verifying results
+semaglutide_2024_outc_NR %>%
+  count(outc_cod) %>%
+  mutate(percentage = round(100 * n / sum(n), 1)) %>%
+  arrange(desc(n))
+
+```
+
+```{r}
+# RE-CONVERTING ALL VARIABLES TO NUMERIC, FACTOR, CHARACTER OR DATE VARIABLES AS NEEDED
+
+semaglutide_2024_outc_NR2 <- semaglutide_2024_outc_NR %>%
+  mutate(
+    # Identifiers
+    caseid = as.character(caseid),               # unique ID, not numeric
+    caseversion = as.numeric(caseversion),       # version number for updates
+    
+    # Demographics
+    age = as.numeric(age),                       # continuous variable (years)
+    age_group = factor(age_group, 
+                       levels = c("YOUNGER ADULTS (18–64)", "OLDER ADULTS (≥65)")),  # categorical
+    age_cod = as.character(age_cod),             # usually "YR", "DEC", etc.
+    sex = factor(sex, levels = c("M", "F", "UNK")),                    # categorical (male, female, unknown)
+    wt = as.numeric(wt),                         # continuous (kg)
+    wt_cod = as.character(wt_cod),               # usually "KG" or similar
+    
+    # Reporter / country
+    reporter_country = factor(reporter_country), # categorical (e.g., US)
+    occr_country = factor(occr_country),         # location of occurrence
+    
+    # Drug info
+    drugname = factor(drugname),                 # categorical (brand)
+    drug_standardized = factor(drug_standardized),      # categorical (brand)
+    prod_ai = as.character(prod_ai),             # active ingredient(s)
+    dose_amt = as.numeric(dose_amt),             # numeric dose
+    dose_unit = as.character(dose_unit),         # dose unit text (mg, ml, etc.)
+    role_cod = factor(role_cod, levels = c("PS", "SS", "C", "I")),     # primary/secondary suspect roles
+    
+    # Event info
+    pt = factor(pt),                             # MedDRA-coded preferred term (event)
+    outc_cod = factor(outc_cod),                 # outcome codes (DE, HO, OT, etc.)
+    event_dt = as.Date(as.character(event_dt), format = "%Y%m%d"),     # date of event
+    rept_dt = as.Date(as.character(rept_dt), format = "%Y%m%d"),       # date of report
+    quarter = factor(quarter, 
+                     levels = c("2024Q1", "2024Q2", "2024Q3", "2024Q4"))  # time period
+  )
+
+summary(semaglutide_2024_outc_NR2)
+```
+
+```{r}
+# Checking proportion of preferred terms (adverse events)
+
+semaglutide_2024_outc_NR2 %>%
+  count(pt) %>%
+  mutate(percentage = round(100 * n / sum(n), 1)) %>%
+  arrange(desc(n))
+
+```
+
+```{r}
+# Verifying final structure to make sure all age_group and reporter_country categories are valid with no missing data
+
+summary(semaglutide_2024_outc_NR2)
+table(semaglutide_2024_outc_NR2$age_group, useNA = "ifany")
+table(semaglutide_2024_outc_NR2$reporter_country)
+```
+
+```{r}
+# Writing the final full dataset
+
+fwrite(semaglutide_2024_outc_NR2, "semaglutide_clean_capstone.csv")
+```
+
+```{r}
+# Removing non PS role codes so the data retains only Primary Suspect cases
+# This will improve causal inference, remove noise and ensure that I am sticking with standard FAERS practice
+
+semaglutide_2024_PS <- semaglutide_2024_outc_NR2 %>%
+  filter(toupper(role_cod) == "PS")
+
+summary(semaglutide_2024_PS)
+```
+# This leaves a total:
+# 5302 cases for descriptives and
+# 2,604 cases for analysis (Multinomial logistic regression)
+
+```{r}
+# Writing the final clean dataset for Capstone
+
+fwrite(semaglutide_2024_PS, "semaglutide_cleanPS_capstone.csv")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
